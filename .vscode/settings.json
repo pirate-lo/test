@@ -1,0 +1,16 @@
+{
+    "files.associations": {
+        "tim.h": "c",
+        "motor.h": "c",
+        "bsp_encoder.h": "c",
+        "bsp_pwm.h": "c",
+        "robot.h": "c",
+        "chassis.h": "c",
+        "robot_def.h": "c",
+        "message.h": "c",
+        "stdint.h": "c",
+        "opstask.h": "c",
+        "ops.h": "c"
+    },
+    "cortex-debug.variableUseNaturalFormat": true
+}
