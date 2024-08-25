@@ -9,19 +9,19 @@ uint8_t OPS_ready = 0;
 static int X_for_DMA = 0, Y_for_DMA = 0, Z_for_DMA = 0;
 static int X_FLASH_DMA = 0, Y_FLASH_DMA = 0, Z_FLASH_DMA = 0;
 
-extern TIM_HandleTypeDef htim5;
 extern UART_HandleTypeDef huart6;
 extern DMA_HandleTypeDef hdma_usart6_rx;
-static USARTInstance *ops_usatr_instance;
+USARTInstance *ops_usatr_instance;
 /*--------------------------------UART6的回调函数，接受ops数据并开启DMA传输数据----------------*/
 static uint16_t get_ops_date(uint8_t *rx_buf,
                              uint16_t *flags_register,
                              uint8_t *rx_data)
 {
-    if(rx_buf[0] == 0x0d && rx_buf[1] == 0x0a)
+    if(rx_buf[0] == 0x2C && rx_buf[21] == 0x5B)
     {
-        *flags_register = (rx_buf[27] << 8) | rx_buf[26];
-        memcpy(&rx_data[2], rx_buf, 28);
+        *flags_register = (rx_buf[21] << 8) | rx_buf[20];
+        memcpy(rx_data, rx_buf, 22);
+        memset(ops_usatr_instance->recv_buff, 0, ops_usatr_instance->recv_buff_size);
     }
     return 0;
 }
@@ -31,10 +31,10 @@ extern uint8_t ch;
 
 static void OPS_usart_back()
 {   
-    if(ch == 0xd)
+    if(ch == 0x2C)
     {   
         USARTServiceInit(ops_usatr_instance);
-        HAL_TIM_Base_Start_IT(&htim5);
+//        HAL_TIM_Base_Start_IT(&htim5);
         OPS_ready = 1;
     }
     else 
@@ -53,11 +53,6 @@ static void OPSCallback()
     {
         get_ops_date(ops_usatr_instance->recv_buff,&flag_register,OPS.data);
         USARTServiceInit(ops_usatr_instance);
-        if(i == 0)
-        {
-            Cali_Ops();
-            i +=1;
-        }
     }
 }
 
@@ -78,57 +73,6 @@ Union_OPS *OPS_Init(UART_HandleTypeDef *_handle)
     return &OPS;
 }
 
-/*--------------------TIM4的回调函数检测ops数据是否正确-----------------------------*/
-void OPS_Check(void)
-{
-    if(OPS.data[2] != 0x0D || OPS.data[3] != 0x0A || OPS.data[28] != 0x0A || OPS.data[29] != 0x0D)  //OPS返回数据帧头 帧尾检测
-        {
-            //若满足条件 进行数据对帧
-            HAL_TIM_Base_Stop_IT(&htim5); //关闭检测定时器
-            HAL_UART_Receive_IT(&huart6, ch, 1);    //开启串口中断
-            __HAL_DMA_DISABLE(&hdma_usart6_rx); //DMA数据流关闭
-            HAL_UART_DMAStop(&huart6);  //关闭DMA串口接收
-    
-           // HAL_GPIO_WritePin(GPIOE,GPIO_PIN_14,GPIO_PIN_SET);
-           // HAL_GPIO_WritePin(GPIOF,GPIO_PIN_11,GPIO_PIN_RESET);       //数据异常亮红灯
-        }
-    else
-    {
-            //HAL_GPIO_WritePin(GPIOE,GPIO_PIN_14,GPIO_PIN_RESET);       //数据正常亮绿灯   
-            //HAL_GPIO_WritePin(GPIOF,GPIO_PIN_11,GPIO_PIN_SET); 
-    }
-
-//......................................................................//
-        X_for_DMA = -OPS.ActVal[4] * 10;
-        Y_for_DMA = -OPS.ActVal[5] * 10;
-        Z_for_DMA = -OPS.ActVal[1] * 100;
-
-        DMA_OPS_buf[6] = X_for_DMA >> 24;     //取数据的高8位
-        DMA_OPS_buf[7] = X_for_DMA >> 16;
-        DMA_OPS_buf[8] = X_for_DMA >> 8;
-        DMA_OPS_buf[9] = X_for_DMA;           //取数据的低8位
-
-        DMA_OPS_buf[10] = Y_for_DMA >> 24;    //取数据的高8位
-        DMA_OPS_buf[11] = Y_for_DMA >> 16;
-        DMA_OPS_buf[12] = Y_for_DMA >> 8;
-        DMA_OPS_buf[13] = Y_for_DMA;          //取数据的低8位
-
-        DMA_OPS_buf[14] = Z_for_DMA >> 8;     //取数据的高8位
-        DMA_OPS_buf[15] = Z_for_DMA;          //取数据的低8位
-
-        DMA_OPS_buf[16] = X_FLASH_DMA >> 24;     //取数据的高8位
-        DMA_OPS_buf[17] = X_FLASH_DMA >> 16;
-        DMA_OPS_buf[18] = X_FLASH_DMA >> 8;
-        DMA_OPS_buf[19] = X_FLASH_DMA;           //取数据的低8位
-
-        DMA_OPS_buf[20] = Y_FLASH_DMA >> 24;    //取数据的高8位
-        DMA_OPS_buf[21] = Y_FLASH_DMA >> 16;
-        DMA_OPS_buf[22] = Y_FLASH_DMA >> 8;
-        DMA_OPS_buf[23] = Y_FLASH_DMA;          //取数据的低8位
-
-        DMA_OPS_buf[24] = Z_FLASH_DMA >> 8;     //取数据的高8位
-        DMA_OPS_buf[25] = Z_FLASH_DMA;          //取数据的低8位
-}
 
 /*---------------------------------发送给ops的数据，包括清零、更新XY坐标----------------------*/
 static void PC_SendChar(uint8_t DataToSend)

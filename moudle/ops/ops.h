@@ -4,13 +4,18 @@
 #include "bsp_uart.h"
 #include "stdint.h"
 
-#define OPS_RECV_SIZE 28u
+#define OPS_RECV_SIZE 22u
 
-typedef union
+typedef struct
 {
-    uint8_t data[32];
-    float ActVal[8];
+    uint8_t data[22];
 } Union_OPS;
+
+typedef struct 
+{
+    uint8_t code[9];
+}Code;
+
 
 Union_OPS *OPS_Init(UART_HandleTypeDef *_handle);
 void OPS_Check();

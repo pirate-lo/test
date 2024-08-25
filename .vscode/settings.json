@@ -10,7 +10,12 @@
         "message.h": "c",
         "stdint.h": "c",
         "opstask.h": "c",
-        "ops.h": "c"
+        "ops.h": "c",
+        "memory.h": "c",
+        "servo.h": "c",
+        "main.h": "c",
+        "connect.h": "c",
+        "bsp_dwt.h": "c"
     },
     "cortex-debug.variableUseNaturalFormat": true
 }

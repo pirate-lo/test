@@ -1,34 +1,72 @@
+/*
+ * @Author: pirate-lo @caoboxun8
+ * @Date: 2024-05-22 23:23:11
+ * @LastEditors: pirate-lo @caoboxun8
+ * @LastEditTime: 2024-08-01 16:44:13
+ * @FilePath: \play\App\OPS\opstask.c
+ * @Description: 这是默认设置,请设置`customMade`, 打开koroFileHeader查看配置 进行设置: https://github.com/OBKoro1/koro1FileHeader/wiki/%E9%85%8D%E7%BD%AE
+ */
 #include "opstask.h"
 #include "message.h"
+
 
 extern UART_HandleTypeDef huart6;
 extern uint8_t OPS_ready;
 extern uint8_t ch;
+extern USARTInstance *ops_usatr_instance;
+extern TIM_HandleTypeDef htim5;
+extern USARTInstance *connect_instance;
+extern uint16_t con_code;
+
 static Union_OPS *OPS_rate;
+static Code *code;
 static PIDInstance pid_ops;
 static uint16_t action_ok;
 
 static Publisher_t *ops_pub;                    // 用于发布底盘的数据
 static Subscriber_t *ops_sub;                   // 用于订阅底盘的控制命令 
 static OPS_chassis ops_cmd_send;
+static ServoInstance *servo;
 
-static float Location_X, Location_Y, Locaton_Anger;
+static int servo_run;
+static float X, Y, loc_x,loc_y;
 static float V_a_y=0,V_a_x=0;
 static float location_x_speed, location_y_speed, location_z_speed;
 
+
+#define RUN_size 5
+#define CON_size 9
+static uint8_t RUN_date[RUN_size] = {0x2C,0,0,0,0X5B};
+static uint8_t CON_date[CON_size] = {0x2C,0X11,0X44,0X65,0X01,0X55,0X41,0X01,0x5B};
+
 void Ops_Init()
 {
-    OPS_rate = OPS_Init(&huart6);
-    PID_Init_Config_s pid_config = {
+   OPS_rate = OPS_Init(&huart6);
+   PID_Init_Config_s pid_config = {
         .Kp = 5.5,
         .Ki = 0.0005,
         .Kd = 0,
-        .MaxOut = 190,
+        .DeadBand = 2,
+        .MaxOut = 800,
     };
     PIDInit(&pid_ops,&pid_config);
 
+    Servo_Init_Config_s Servo_Init_Config = {
+        .htim = &htim5,
+        .Channel = TIM_CHANNEL_2,
+        .Servo_Angle_Type = Start_mode,
+        .Servo_type = Servo180,
+    };
+    servo = ServoInit(&Servo_Init_Config);
+    Servo_Motor_StartSTOP_Angle_Set(servo,90,95);
+
+
     ops_sub = SubRegister("chassis_feed", sizeof(OPS_chassis));
     ops_pub = PubRegister("chassis_cmd", sizeof(OPS_chassis));
+
+
+
+
 }
 
 static float Ops_abs(float x)
@@ -38,143 +76,104 @@ static float Ops_abs(float x)
     return x;
 }
 
-static float Length = 0, cosx = 0, sinx = 0, V_slow = 0,lenth=0;
-static float V_Length_max = 0, V_X_max = 0, V_Y_max = 0;
-static float cosx_PID = 0, sinx_PID = 0;
-static float V_a=0;
-static int went_1,went_2;
-static float turn_1;
-static uint16_t  action_back = 0;
+
+static int went_1,went_2, task1,task2;
+static uint8_t run;
 
 static void Clearn_ops()
 {
-    V_slow = 0;
     went_1 = 0;
     went_2 = 0;
-    turn_1 = 0;
     location_x_speed = 0;
     location_y_speed = 0;
     location_z_speed = 0;   
 }
 
-static void Location_Plot(float x, float y, float z,float eero1)
-{	
-	  //x=-x;
-	  //y=-y;
-	  //z=-z;
-    Location_X = x;           //PID X 目标参数赋值
-    Location_Y = y;           //PID Y 目标参数赋值
-    Locaton_Anger = z;        //PID Z 目标参数赋值
-
-    Length = sqrt((x - OPS_rate->ActVal[4]) * (x - OPS_rate->ActVal[4]) + (y - OPS_rate->ActVal[5]) * (y - OPS_rate->ActVal[5])); //计算目标定位位移长度
-    cosx = (x - OPS_rate->ActVal[4]) / Length;                            //计算目标定位航向角的余弦值
-    sinx = (y - OPS_rate->ActVal[5]) / Length;                            //计算目标定位航向角的正弦值
-    
-    //短距离///##+(y-pos_y)
-
-    if(V_slow < 100 && went_1 == 0)   //加速至运算最大速度
-    {		
-                V_slow += 10;            //(300/20)*10ms=150ms加速至峰值速度
-                location_x_speed = V_slow * cosx;
-                location_y_speed = V_slow * sinx;
-                location_z_speed = PIDCalculate(&pid_ops,OPS_rate->ActVal[6],Locaton_Anger);
-    }
-    else
-    {
-        went_1 = 1;
-    }
-////////////定位目标点，误差 1mm, 1°///
-    if(went_1 == 1 && Ops_abs(OPS_rate->ActVal[4] - x) > eero1*1.0f || Ops_abs(OPS_rate->ActVal[5] - y) > eero1*1.0f || Ops_abs(OPS_rate->ActVal[6] - z) > eero1*1.0f)
-    {
-        location_x_speed = PIDCalculate(&pid_ops,OPS_rate->ActVal[4],Location_X);
-        location_y_speed = PIDCalculate(&pid_ops,OPS_rate->ActVal[5],Location_Y);
-        location_z_speed = PIDCalculate(&pid_ops,OPS_rate->ActVal[6],Locaton_Anger);  
-    }
-    if(Ops_abs(OPS_rate->ActVal[4] - x) < eero1*1.0f && Ops_abs(OPS_rate->ActVal[5] - y) < eero1*1.0f && Ops_abs(OPS_rate->ActVal[6] - z) < eero1*1.0f)
-    {
-       Clearn_ops();
-       action_back ++;
-    }
-}
-
-static void Turn_anger(float turn_z)
+static void Openmv_get()
 {
-    if (turn_z > 0)
-    {
-        if (turn_1 < 5)
-        {
-            location_z_speed += 75;
-            turn_1 ++;
-        }
-        else
-        {
-            went_2 = 1;
-        }
-    }
-    if (turn_z < 0)
-    {
-        if (turn_1 < 5)
-        {
-            location_z_speed -= 50;
-            turn_1 ++;
-        }
-        else
-        {
-            went_2 =1;
-        }
-    }
-    if(went_2 == 1 && Ops_abs(OPS_rate->ActVal[6] - turn_z) > 1.0f)
-    {
-        location_z_speed = 5*PIDCalculate(&pid_ops,OPS_rate->ActVal[6],turn_z);  
-    }
-    if(Ops_abs(OPS_rate->ActVal[6] - turn_z) < 1.0f)
-    {
+    memcpy(code->code,&OPS_rate->data[1],9);
+    if( OPS_rate->data[10] == 0){X = -(float)(OPS_rate->data[12] *256 + OPS_rate->data[11]);}
+    else X = (float)(OPS_rate->data[12] *256 + OPS_rate->data[11]) ;
+    if( OPS_rate->data[13] == 0){Y = -(float)OPS_rate->data[14];}
+    else Y = (float)OPS_rate->data[14];
+    if( OPS_rate->data[15] == 0){loc_x = -(float)(OPS_rate->data[17] *256 + OPS_rate->data[16]);}
+    else loc_x = (float)(OPS_rate->data[17] *256 + OPS_rate->data[16]);
+    if( OPS_rate->data[18] == 0){loc_y = -(float)OPS_rate->data[19];}
+    else loc_y = (float)OPS_rate->data[19] ;
+}
 
+/*
+static connect_send()
+{
+    if(loc_x > 0){ if(loc_y >= 0) CON_date[4] = 0x11;else CON_date[4] = 0x10;}
+    if(loc_x < 0){ if(loc_y >= 0) CON_date[4] = 0x01;else CON_date[4] = 0x00;}
+    if(X > 0){ if(Y >= 0) CON_date[1] = 0x11;else CON_date[1] = 0x10;}
+    if(X < 0){ if(Y >= 0) CON_date[1] = 0x01;else CON_date[1] = 0x00;}
+    CON_date[2] = (uint8_t)X ;
+    CON_date[3] = (uint8_t)Y; CON_date[5] = (uint8_t)loc_x ;CON_date[6] = (uint8_t)loc_y;CON_date[7] = 1;
+}
+*/
+
+/*********************任务进行**************/
+static void RUNTask(uint8_t qi,uint8_t di)
+{
+    if(OPS_rate->data[0] == 0)
+    {   
+        RUN_date[1] = 0;
+        RUN_date[2] = 0;
+        RUN_date[3] = 1;
+        USARTSend(ops_usatr_instance,RUN_date,RUN_size, USART_TRANSFER_DMA);
+        if(OPS_rate->data[0] != 0x2C || OPS_rate->data[21] != 0x5B )
+            HAL_UART_Receive_IT(&huart6, ch, 1);
+    }
+    else if(OPS_rate->data[0] == 0x2C )
+    {
+        RUN_date[1] = qi;
+        RUN_date[2] = di;
+        RUN_date[3] = 1;
+        USARTSend(ops_usatr_instance,RUN_date,RUN_size, USART_TRANSFER_DMA);
+    }
+    if(OPS_rate->data[20] == 1)
+    {
+        Openmv_get();
+        if(Ops_abs(X) > 4 && went_1 == 0) {location_x_speed = PIDCalculate(&pid_ops,X,0);went_1++;}
+        if(Ops_abs(Y) > 4 && went_1 == 1) {location_y_speed = PIDCalculate(&pid_ops,Y,0);went_1++;}
+        if(went_1 == 2) {went_1++;}
+        if(Ops_abs(loc_x) > 4 && went_1 == 3) {location_x_speed = PIDCalculate(&pid_ops,loc_x,0);went_1++;}
+        if(Ops_abs(loc_y) > 4 && went_1 == 4) {location_y_speed = PIDCalculate(&pid_ops,loc_y,0);went_1++;}
+        if(went_1 == 5) {went_1++;}
+        if(went_1 == 6){RUN_date[3] = 2;
+        for(int i = 0;i < 1000; i++)
+        {USARTSend(ops_usatr_instance,RUN_date,RUN_size, USART_TRANSFER_DMA);}
+        run ++;
+        }
     }
 }
 
+uint8_t Servo0[] = {0x55, 0x55 ,0x055 ,0x06 ,0x00, 0x01 ,0x00 };
+uint8_t Servo1[] = {0x55, 0x55 ,0x055 ,0x06 ,0x01, 0x01 ,0x00 };
+ 
 void OPSTask()
 {
-        if(OPS_rate->data[2] != 0x0D || OPS_rate->data[3] != 0x0A || OPS_rate->data[28] != 0x0A || OPS_rate->data[29] != 0x0D)
-        {
-            action_ok = 0;
-            HAL_UART_Receive_IT(&huart6, ch, 1);
-        }
-        else
-        {
-            action_ok = 1;
-        }
-        if(action_ok == 1)
-        {
-            switch (action_back)
-            {
-            case 0:
-                Location_Plot(1000,1000,0,10);
-                break;
-            case 1:
-                Location_Plot(1000,-1000,0,10);
-                break;
-            case 2:
-                Location_Plot(-1000,-1000,0,10);
-                break;    
-            case 3:
-                Location_Plot(-1000,1000,0,10);
-                break;    
-            case 4:
-                Location_Plot(0,0,0,10);
-                break;    
-            default:
-                break;
-            }
-        }
-        else
-        {
-            location_x_speed = 0;
-            location_y_speed = 0;
-            location_z_speed = 0;
-        }
-        ops_cmd_send.chassis_vx = location_x_speed;
-        ops_cmd_send.chassis_vy = location_y_speed;
-        ops_cmd_send.chassis_vz = location_z_speed;
-        PubPushMessage(ops_pub, (void *)&ops_cmd_send);           
+    if(run == 0)
+    {
+        USARTSend(ops_usatr_instance,Servo0,sizeof(Servo0), USART_TRANSFER_DMA);
+        run ++;
+    }
+    if(run == 1)
+    {
+        HAL_GPIO_WritePin(GPIOF, GPIO_PIN_3, GPIO_PIN_SET);
+        run ++;
+    }
+    if(run == 2)
+    {
+        USARTSend(ops_usatr_instance,Servo1,sizeof(Servo1), USART_TRANSFER_DMA);
+        run ++;
+    }
+    if(run == 3)
+    {
+        HAL_GPIO_WritePin(GPIOF, GPIO_PIN_3, GPIO_PIN_RESET);
+        run ++;
+    }
+
 }

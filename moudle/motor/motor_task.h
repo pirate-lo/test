@@ -1,6 +1,7 @@
 #ifndef MOTOR_TASK_H
 #define MOTOR_TASK_H
 #include "motor.h"
+#include "Servo.h"
 
 /**
  * @brief 电机控制闭环任务,在RTOS中应该设定为1Khz运行
@@ -12,6 +13,7 @@ void MotorControlTask();
 void MotorControlTask()
 {
     MotorControl();
+    ServeoMotorControl();
 }
 
 #endif 

@@ -49,11 +49,12 @@ USARTInstance *USARTRegister(USART_Init_Config_s *init_config)
 
     usart_instance[idx++] = instance;
     //USARTServiceInit(instance);
-    if(instance->usart_handle  == &huart6)
+    if(instance->usart_handle  == &huart6 )
     {
         HAL_UART_Receive_IT(&huart6, &ch, 1);
         DWT_Delay(0.1);
     }
+    else USARTServiceInit(instance);
     return instance;
 }
 

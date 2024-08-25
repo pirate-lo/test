@@ -8,10 +8,11 @@ static OPS_chassis chassis_cmd_recv;
 
 static float chassis_SPEED_PID[3] = {0};
 static float chassis_vx =0, chassis_vy = 0, chassis_wz = 0;     
-static float vt_1 = 0, vt_2 = 0, vt_3 = 0, vt_4 = 0;
+static float vt_1 = 1000, vt_2 = 1000, vt_3 = 1000, vt_4 = 1000;
 
 void ChassisInit(void)
 {   
+
     chassis_SPEED_PID[0]=100;
     chassis_SPEED_PID[1]=0.000025;
     chassis_SPEED_PID[2]=0.001;
@@ -20,9 +21,9 @@ void ChassisInit(void)
             .Kd = chassis_SPEED_PID[2],
             .Ki = chassis_SPEED_PID[1],
             .Kp = chassis_SPEED_PID[0],
-            .IntegralLimit = 3000,
+            .IntegralLimit = 2000,
             .Output_LPF_RC = 0.02,
-            .DeadBand = 40,
+            .DeadBand = 20,
             .Improve = PID_Trapezoid_Intergral | PID_Integral_Limit | PID_Derivative_On_Measurement | PID_OutputFilter,
             .MaxOut = 5000,
         },
@@ -31,7 +32,7 @@ void ChassisInit(void)
             .outer_loop_type = SPEED_LOOP,
             .close_loop_type = SPEED_LOOP,
         },
-        .encoder_config .htim = &htim1,
+        .encoder_config.htim = &htim1,
         .pwm_1_config = {
             .htim = &htim10,
             .channel = TIM_CHANNEL_1,
@@ -84,10 +85,10 @@ void ChassisInit(void)
 
 static void MecanumCalculate()
 {
-    vt_1 = (-chassis_vx + chassis_vy + chassis_wz * CENTER);
+    vt_1 = (chassis_vx + chassis_vy + chassis_wz * CENTER);
     vt_2 = (chassis_vx + chassis_vy - chassis_wz * CENTER);
     vt_3 = (-chassis_vx + chassis_vy - chassis_wz * CENTER);
-    vt_4 = (chassis_vx + chassis_vy + chassis_wz * CENTER);
+    vt_4 = (-chassis_vx + chassis_vy + chassis_wz * CENTER);
 }
 
 /*开环控制*/
@@ -145,11 +146,14 @@ static void Chassis_dug()
 
 void ChassisTask()
 {
-    SubGetMessage(chassis_sub, &chassis_cmd_recv);
-    ChassisEnable();
-    chassis_vx = chassis_cmd_recv.chassis_vx;
-    chassis_vy = chassis_cmd_recv.chassis_vy;
-    chassis_wz = chassis_cmd_recv.chassis_vz;
-    MecanumCalculate();
-    Chassissetref();
+/*
+        SubGetMessage(chassis_sub, &chassis_cmd_recv);      
+        ChassisEnable();
+        chassis_vx = chassis_cmd_recv.chassis_vx;
+        chassis_vy = chassis_cmd_recv.chassis_vy;
+        chassis_wz = chassis_cmd_recv.chassis_vz;
+        MecanumCalculate();
+        Chassissetref();
+       // MotorSetRef(motor1,100);
+*/
 }

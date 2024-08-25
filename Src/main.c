@@ -107,6 +107,7 @@ int main(void)
   MX_TIM7_Init();
   MX_USART6_UART_Init();
   MX_TIM5_Init();
+  MX_USART2_UART_Init();
   /* USER CODE BEGIN 2 */
   RobotInit();
   /* USER CODE END 2 */
@@ -200,10 +201,6 @@ void HAL_TIM_PeriodElapsedCallback(TIM_HandleTypeDef *htim)
   if (htim->Instance == TIM7)
   {
     PeriodElapsedCallback();
-  }
-  if (htim->Instance == TIM5)
-  {
-    OPS_Check();
   }
   /* USER CODE END Callback 1 */
 }
