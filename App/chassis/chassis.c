@@ -149,9 +149,9 @@ void ChassisTask()
 
         SubGetMessage(chassis_sub, &chassis_cmd_recv);      
         ChassisEnable();
-        chassis_vx = chassis_cmd_recv.chassis_vx;
-        chassis_vy = chassis_cmd_recv.chassis_vy;
-        chassis_wz = chassis_cmd_recv.chassis_vz;
+       // chassis_vx = chassis_cmd_recv.chassis_vx;
+       // chassis_vy = chassis_cmd_recv.chassis_vy;
+       // chassis_wz = chassis_cmd_recv.chassis_vz;
         MecanumCalculate();
         Chassissetref();
         MotorSetRef(motor1,100);
