@@ -140,7 +140,7 @@ static void Chassis_dug()
     }
     else
     {
-            chassis_vy = 100;
+            chassis_vy = 0;
     }
 }
 
