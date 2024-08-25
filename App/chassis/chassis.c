@@ -146,7 +146,7 @@ static void Chassis_dug()
 
 void ChassisTask()
 {
-/*
+
         SubGetMessage(chassis_sub, &chassis_cmd_recv);      
         ChassisEnable();
         chassis_vx = chassis_cmd_recv.chassis_vx;
@@ -154,6 +154,6 @@ void ChassisTask()
         chassis_wz = chassis_cmd_recv.chassis_vz;
         MecanumCalculate();
         Chassissetref();
-       // MotorSetRef(motor1,100);
-*/
+        MotorSetRef(motor1,100);
+
 }
