@@ -154,6 +154,6 @@ void ChassisTask()
        // chassis_wz = chassis_cmd_recv.chassis_vz;
         MecanumCalculate();
         Chassissetref();
-        MotorSetRef(motor1,100);
+        MotorSetRef(motor1,1);
 
 }
