@@ -13,7 +13,7 @@ static float vt_1 = 1000, vt_2 = 1000, vt_3 = 1000, vt_4 = 1000;
 void ChassisInit(void)
 {   
 
-    chassis_SPEED_PID[0]=100;
+    chassis_SPEED_PID[0]=10;
     chassis_SPEED_PID[1]=0.000025;
     chassis_SPEED_PID[2]=0.002;
     Motor_Init_Config_s config ={
