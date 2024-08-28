@@ -155,5 +155,6 @@ void ChassisTask()
         MecanumCalculate();
         Chassissetref();
         MotorSetRef(motor1,1000);
+        HAL_Delay(0.1);
 
 }
