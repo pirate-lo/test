@@ -34,7 +34,7 @@ static float V_a_y=0,V_a_x=0;
 static float location_x_speed, location_y_speed, location_z_speed;
 
 
-#define RUN_size 5
+#define RUN_size 50
 #define CON_size 9
 static uint8_t RUN_date[RUN_size] = {0x2C,0,0,0,0X5B};
 static uint8_t CON_date[CON_size] = {0x2C,0X11,0X44,0X65,0X01,0X55,0X41,0X01,0x5B};
